@@ -77,6 +77,15 @@ can never reach a different session's socket.
 Without that, a login service only sees the default socket and would start an
 empty Herdr session instead of attaching to the ones already running.
 
+### Self-hosted origin (pair.kidsbox.cc)
+
+This fork runs its own relay. `workers/pairfob-origin/wrangler.kidsbox.jsonc`
+is the production config (custom domain, D1 `pairfob`, no analytics binding)
+and `scripts/deploy-kidsbox.sh` builds the PWA, packs it as the only static
+surface, applies D1 migrations remotely and deploys. Secrets `IP_HASH_PEPPER`
+and `OPERATOR_TOKEN` are set once with `wrangler secret put`. The daemon is
+pointed at it with `PAIRFOB_ORIGIN=https://pair.kidsbox.cc`.
+
 ## How it works
 
 ```
