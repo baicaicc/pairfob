@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { agentDetailRows, agentMeta, agentTitle, canPromptAgent, choosePane, chromeName, herdSignature, mapSnapshotAgents, paneFillCopy, statusLabel, tabIsSplit, visibleTabLabel } from "./dashboard.ts";
+import { agentDetailRows, agentMeta, agentTitle, canPromptAgent, choosePane, chromeName, herdSignature, mapSnapshotAgents, paneFillCopy, snapshotSessions, statusLabel, tabIsSplit, visibleTabLabel } from "./dashboard.ts";
 
 describe("dashboard mapping", () => {
   const snapshot = {
@@ -345,5 +345,30 @@ describe("dashboard mapping", () => {
     const rows = agentDetailRows(pane);
     expect(rows.map((row) => row.value)).not.toContain("zsh");
     expect(rows.some((row) => row.key === "标签页")).toBe(false);
+  });
+});
+
+describe("aggregated sessions", () => {
+  test("mapSnapshotAgents carries the session from the pane or its workspace", () => {
+    const cards = mapSnapshotAgents({
+      sessions: [{ name: "first_dev", workspaces: 1, panes: 1 }, { name: "work", workspaces: 1, panes: 1 }],
+      workspaces: [
+        { workspace_id: "first_dev::w9", label: "search_rca", session: "first_dev" },
+        { workspace_id: "work::w9", label: "search_rca", session: "work" },
+      ],
+      panes: [
+        { pane_id: "first_dev::w9:p1", workspace_id: "first_dev::w9", agent: "claude", agent_status: "idle", session: "first_dev" },
+        { pane_id: "work::w9:p1", workspace_id: "work::w9", agent: "grok", agent_status: "working" },
+      ],
+    });
+    expect(cards.map((card) => card.session)).toEqual(["first_dev", "work"]);
+    expect(agentMeta(cards[0])).toContain("first_dev");
+    expect(agentMeta(cards[1])).toContain("work");
+  });
+
+  test("snapshotSessions prefers the daemon list and falls back to pane sessions", () => {
+    expect(snapshotSessions({ sessions: [{ name: "b" }, { name: "a" }], panes: [] })).toEqual(["b", "a"]);
+    expect(snapshotSessions({ panes: [{ pane_id: "x::1", workspace_id: "x::w", session: "x" }, { pane_id: "y::1", workspace_id: "y::w", session: "y" }] })).toEqual(["x", "y"]);
+    expect(snapshotSessions({ panes: [{ pane_id: "1", workspace_id: "w" }] })).toEqual([]);
   });
 });

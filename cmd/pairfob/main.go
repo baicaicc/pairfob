@@ -63,7 +63,7 @@ func runDaemon(store *state.Store, sock string) error {
 
 	devFake := getenv("PAIRFOB_DEV_FAKE_RUNTIME", "") == "1"
 	multiSession := getenv("PAIRFOB_MULTI_SESSION", "") == "1"
-	rt, source, rtErr := runtime.Open(devFake, multiSession)
+	rt, source, rtErr := openRuntime()
 	if rtErr != nil {
 		log.Printf("runtime herdr_offline: %v", rtErr)
 		rt = runtime.NewOffline(rtErr)

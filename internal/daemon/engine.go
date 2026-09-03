@@ -511,7 +511,7 @@ func (e *Engine) RuntimeKind() string {
 		return "fake"
 	case *runtimeapi.Offline:
 		return "offline"
-	case *runtimeapi.Herdr:
+	case *runtimeapi.Herdr, *runtimeapi.Multi:
 		return "herdr"
 	default:
 		return "unknown"

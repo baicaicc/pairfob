@@ -166,3 +166,16 @@ describe("group collapse", () => {
     });
   });
 });
+
+describe("aggregated sessions", () => {
+  test("space group titles carry the session so identical workspace names stay apart", () => {
+    const cards: AgentCard[] = [
+      { paneId: "first_dev::w9:p1", agent: "claude", status: "idle", workspaceId: "first_dev::w9", workspaceLabel: "search_rca", session: "first_dev", cwd: "/" },
+      { paneId: "work::w9:p1", agent: "grok", status: "working", workspaceId: "work::w9", workspaceLabel: "search_rca", session: "work", cwd: "/" },
+      { paneId: "solo", agent: "codex", status: "idle", workspaceId: "w1", workspaceLabel: "solo", cwd: "/" },
+    ];
+    const groups = groupAgents(cards, "space", {});
+    expect(groups.map((group) => group.title).sort()).toEqual(["first_dev · search_rca", "solo", "work · search_rca"]);
+    expect(groups.map((group) => group.id).sort()).toEqual(["first_dev::w9", "w1", "work::w9"]);
+  });
+});

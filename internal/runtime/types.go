@@ -77,6 +77,16 @@ type Snapshot struct {
 	Tabs          []Tab             `json:"tabs"`
 	Panes         []Pane            `json:"panes"`
 	Layouts       []TabLayout       `json:"layouts,omitempty"`
+	// Sessions is set only by the Multi runtime: one entry per live Herdr
+	// session folded into this snapshot, in display order.
+	Sessions []SessionInfo `json:"sessions,omitempty"`
+}
+
+// SessionInfo names one live Herdr session inside an aggregated snapshot.
+type SessionInfo struct {
+	Name       string `json:"name"`
+	Workspaces int    `json:"workspaces"`
+	Panes      int    `json:"panes"`
 }
 
 type Workspace struct {
@@ -85,12 +95,15 @@ type Workspace struct {
 	Label       string `json:"label"`
 	Cwd         string `json:"cwd"`
 	AgentStatus string `json:"agent_status"`
+	// Session is the Herdr session this workspace lives in (Multi runtime only).
+	Session string `json:"session,omitempty"`
 }
 
 type Tab struct {
 	TabID       string `json:"tab_id"`
 	WorkspaceID string `json:"workspace_id"`
 	Label       string `json:"label"`
+	Session     string `json:"session,omitempty"`
 }
 
 type AgentSessionRef struct {
@@ -107,6 +120,7 @@ type Pane struct {
 	Cwd         string  `json:"cwd"`
 	Agent       string  `json:"agent"`
 	AgentStatus string  `json:"agent_status"`
+	Session     string  `json:"session,omitempty"`
 	Label       *string `json:"label"`
 	// TerminalTitle is the stripped PTY OSC title. Display-only; it is not a user-assigned name.
 	TerminalTitle    string `json:"terminal_title,omitempty"`

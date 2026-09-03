@@ -9,7 +9,8 @@ export type DashboardAgentCard = AgentCard & {
 export type SnapshotWire = {
   focused?: { pane_id?: string; tab_id?: string; workspace_id?: string };
   layouts?: unknown;
-  workspaces?: Array<{ workspace_id: string; label?: string; cwd?: string }>;
+  sessions?: Array<{ name: string; workspaces?: number; panes?: number }>;
+  workspaces?: Array<{ workspace_id: string; label?: string; cwd?: string; session?: string }>;
   tabs?: Array<{ tab_id: string; workspace_id: string; label?: string }>;
   panes?: Array<{
     pane_id?: string;
@@ -18,6 +19,7 @@ export type SnapshotWire = {
     cwd?: string;
     agent?: string;
     agent_status?: string;
+    session?: string;
     label?: string | null;
     terminal_title?: string | null;
     history_available?: boolean;
@@ -37,6 +39,18 @@ function snapshotAgentStatus(hasAgent: boolean, wire: string | undefined): Agent
     default:
       return "unknown";
   }
+}
+
+/** Session names present in an aggregated snapshot; empty for a single-session daemon. */
+export function snapshotSessions(snapshot: SnapshotWire): string[] {
+  const listed = (snapshot.sessions || []).map((item) => item.name?.trim() || "").filter(Boolean);
+  if (listed.length) return listed;
+  const seen = new Set<string>();
+  for (const pane of snapshot.panes || []) {
+    const name = pane.session?.trim();
+    if (name) seen.add(name);
+  }
+  return [...seen];
 }
 
 export function mapSnapshotAgents(snapshot: SnapshotWire): DashboardAgentCard[] {
@@ -59,6 +73,7 @@ export function mapSnapshotAgents(snapshot: SnapshotWire): DashboardAgentCard[] 
         hasAgent,
         status: snapshotAgentStatus(hasAgent, pane.agent_status),
         workspaceLabel: ws?.label?.trim() || "",
+        session: pane.session?.trim() || ws?.session?.trim() || undefined,
         cwd: pane.cwd || ws?.cwd || "",
         viewportRows: pane.scroll?.viewport_rows,
         historyAvailable: pane.history_available === true,
@@ -217,6 +232,7 @@ export function agentMeta(agent: AgentCard, group: ListGroup = "flat"): string {
     bits.push(text);
   };
   if (group !== "agent") push(who);
+  if (group !== "space") push(agent.session);
   if (group === "space") {
     if (dir && !same(dir, workspace)) push(dir);
   } else {

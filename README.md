@@ -55,6 +55,28 @@ Enter once on the computer to admit the device.
 
 Docs: [pairfob.com/doc](https://pairfob.com/doc/).
 
+## All Herdr sessions in one pairing
+
+This fork can fold every live Herdr session on the computer into one phone
+list. Start the daemon (or install the service from a shell) with:
+
+```sh
+PAIRFOB_HERDR_MULTI=1 pairfob
+```
+
+The daemon then watches `~/.config/herdr/herdr.sock` and every
+`~/.config/herdr/sessions/<name>/herdr.sock` that answers. Workspace, tab and
+pane ids on the phone are qualified as `<session>::<id>` (for example
+`first_dev::w1:pE`), and the snapshot carries a `sessions` list plus a
+`session` field on each item. The session named by `HERDR_SOCKET_PATH` is
+listed first and owns the default focus. Bare ids are rejected, so a request
+can never reach a different session's socket.
+
+`pairfob service install` copies `HERDR_SOCKET_PATH`, `HERDR_BIN` and the
+`PAIRFOB_*` runtime switches from the installing shell into the user service.
+Without that, a login service only sees the default socket and would start an
+empty Herdr session instead of attaching to the ones already running.
+
 ## How it works
 
 ```

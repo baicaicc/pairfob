@@ -66,7 +66,7 @@ func gatherHealth(sock string) (health, error) {
 			h.Phones = len(live)
 		}
 	}
-	rt, _, rtErr := runtime.Open(false, getenv("PAIRFOB_MULTI_SESSION", "") == "1")
+	rt, _, rtErr := openRuntime()
 	if rtErr == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_, rtErr = rt.Describe(ctx, runtime.DefaultSession())
@@ -74,7 +74,7 @@ func gatherHealth(sock string) (health, error) {
 	}
 	if rtErr == nil {
 		h.HerdrOK = true
-		h.HerdrNote = "on"
+		h.HerdrNote = herdrHealthNote(rt)
 	} else {
 		h.HerdrNote = "off — open Herdr on this computer"
 	}

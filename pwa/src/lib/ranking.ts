@@ -12,6 +12,8 @@ export interface AgentCard {
   agent: string;
   status: AgentStatus;
   workspaceLabel: string;
+  /** Herdr session name when the daemon aggregates several sessions. */
+  session?: string;
   cwd: string;
   viewportRows?: number;
   historyAvailable?: boolean;
@@ -107,7 +109,8 @@ export function parseListGroup(raw: string | null | undefined): ListGroup {
 function groupKey(agent: AgentCard, mode: Exclude<ListGroup, "flat">): { id: string; title: string } {
   if (mode === "space") {
     const id = agent.workspaceId || agent.workspaceLabel || "space";
-    return { id, title: agent.workspaceLabel || t("workspace.unnamed") };
+    const label = agent.workspaceLabel || t("workspace.unnamed");
+    return { id, title: agent.session ? `${agent.session} · ${label}` : label };
   }
   const name = agent.agent.trim();
   if (!name) return { id: "unbound", title: t("group.unbound") };

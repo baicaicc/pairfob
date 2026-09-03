@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -126,7 +127,7 @@ func launchdPlist(execPath, logPath, home string) string {
     <string>` + xmlEscape(home) + `</string>
     <key>PATH</key>
     <string>` + xmlEscape(userServicePATH(home)) + `</string>
-  </dict>
+` + launchdServiceEnvironment(serviceEnvironment()) + `  </dict>
 </dict>
 </plist>
 `
@@ -147,10 +148,55 @@ StandardOutput=append:` + systemdQuote(logPath) + `
 StandardError=append:` + systemdQuote(logPath) + `
 Environment=HOME=` + systemdQuote(home) + `
 Environment=PATH=` + systemdQuote(userServicePATH(home)) + `
-
+` + systemdServiceEnvironment(serviceEnvironment()) + `
 [Install]
 WantedBy=default.target
 `
+}
+
+// servicePassthroughEnv lists the variables copied from the installing shell
+// into the user service, so `pairfob service install` run inside a Herdr pane
+// keeps that pane's socket and the chosen runtime mode after login.
+var servicePassthroughEnv = []string{
+	"HERDR_SOCKET_PATH", "HERDR_BIN",
+	"PAIRFOB_HERDR_MULTI", "PAIRFOB_HERDR_AUTOSTART", "PAIRFOB_MULTI_SESSION",
+	"PAIRFOB_ORIGIN", "PAIRFOB_STATE_DIR", "PAIRFOB_P2P", "PAIRFOB_PUSH",
+}
+
+func serviceEnvironment() map[string]string {
+	out := map[string]string{}
+	for _, key := range servicePassthroughEnv {
+		if value := os.Getenv(key); value != "" {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func systemdServiceEnvironment(env map[string]string) string {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, key := range keys {
+		b.WriteString("Environment=" + key + "=" + systemdQuote(env[key]) + "\n")
+	}
+	return b.String()
+}
+
+func launchdServiceEnvironment(env map[string]string) string {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for _, key := range keys {
+		b.WriteString("    <key>" + xmlEscape(key) + "</key>\n    <string>" + xmlEscape(env[key]) + "</string>\n")
+	}
+	return b.String()
 }
 
 func userServicePATH(home string) string {
