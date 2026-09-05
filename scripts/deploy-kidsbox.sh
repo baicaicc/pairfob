@@ -30,5 +30,11 @@ bunx wrangler deploy --config "$CONFIG" --var "BUILD:$BUILD"
 
 echo "verifying…"
 sleep 3
-curl -sS --max-time 20 https://pair.kidsbox.cc/api/config; echo
-curl -sS --max-time 20 https://pair.kidsbox.cc/v2/grants; echo
+config="$(curl -sS --max-time 20 -w '\n%{http_code}' https://pair.kidsbox.cc/api/config)"
+echo "api/config http=${config##*$'\n'} ${config%$'\n'*}"
+[[ "${config##*$'\n'}" == "200" ]] || { echo "api/config expected 200" >&2; exit 1; }
+# /v2/grants was retired with grantless enroll (src/worker.ts): it must answer
+# 404 "unbound", never mint a join grant.
+grants="$(curl -sS --max-time 20 -w '\n%{http_code}' https://pair.kidsbox.cc/v2/grants)"
+echo "v2/grants http=${grants##*$'\n'} ${grants%$'\n'*}"
+[[ "${grants##*$'\n'}" == "404" ]] || { echo "v2/grants expected retired 404" >&2; exit 1; }
