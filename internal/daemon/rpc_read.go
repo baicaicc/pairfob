@@ -164,7 +164,7 @@ func (e *Engine) rpcHistory(s *sess, id string, params json.RawMessage) {
 		e.replyTerminalHistory(s, id, p.Session, p.PaneID, lines)
 		return
 	}
-	ref := journalRef(pane.AgentSession)
+	ref, _ := e.selectJournalRef(context.Background(), runtimeSession(p.Session), *pane)
 	if e.Journal == nil || !e.Journal.Supports(ref) {
 		e.replyErr(s, id, "transcript_unavailable", "pane has no supported trusted transcript binding")
 		return
@@ -276,7 +276,7 @@ func (e *Engine) agentTraceRef(s *sess, id string, session *string, paneID strin
 		e.replyErr(s, id, "pane_not_found", "pane is no longer available")
 		return journal.Ref{}, false
 	}
-	ref := journalRef(pane.AgentSession)
+	ref, _ := e.selectJournalRef(context.Background(), runtimeSession(session), *pane)
 	if e.Journal == nil || !e.Journal.Supports(ref) {
 		e.replyErr(s, id, "transcript_unavailable", "pane has no supported trusted transcript binding")
 		return journal.Ref{}, false

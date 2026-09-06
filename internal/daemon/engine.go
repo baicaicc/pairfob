@@ -125,6 +125,7 @@ type Engine struct {
 	PushEnabled    bool
 	Direct         DirectAcceptor
 	Journal        *journal.Reader
+	CursorConfig   *journal.CursorConfig
 
 	pairOpenMu    sync.Mutex
 	mu            sync.Mutex
@@ -153,7 +154,8 @@ type Engine struct {
 	operations   map[string]*operationRecord
 	operationSeq uint64
 
-	reads observeGroup
+	reads          observeGroup
+	cursorIdentity cursorIdentityReader
 }
 
 const PairingTTLDefault = 180 * time.Second
@@ -186,8 +188,21 @@ func NewEngine(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime) *Engine {
 	return newEngine(hub, conn, rt, pk, sk)
 }
 
+// NewEngineWithCursorConfig creates an ephemeral engine with an explicitly
+// loaded Cursor resolver configuration. It never reads local configuration.
+func NewEngineWithCursorConfig(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime, config *journal.CursorConfig) *Engine {
+	e := NewEngine(hub, conn, rt)
+	e.CursorConfig = config
+	e.Journal.Cursor = config
+	return e
+}
+
 // NewPersistentEngine restores (or creates) the daemon identity and devices.
 func NewPersistentEngine(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime, store *state.Store, logger *audit.Logger) (*Engine, error) {
+	cursorConfig, err := journal.LoadCursorConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
 	if err := ValidateAllowedRoots(); err != nil {
 		return nil, err
 	}
@@ -212,6 +227,8 @@ func NewPersistentEngine(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime, sto
 		return nil, err
 	}
 	e := newEngine(hub, conn, rt, pk, sk)
+	e.CursorConfig = cursorConfig
+	e.Journal.Cursor = cursorConfig
 	e.Store, e.Audit, e.Identity = store, logger, id
 	e.DaemonID, e.Reconnect = id.DaemonID, relay.ReconnectToken
 	e.RelayURL, e.VAPIDPublic = relay.URL, vapid.Public

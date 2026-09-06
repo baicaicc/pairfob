@@ -42,10 +42,11 @@ var (
 // Ref is a trusted pane-to-agent-session binding reported by Herdr. Callers
 // must never construct it from phone-supplied transcript identifiers.
 type Ref struct {
-	Source string
-	Agent  string
-	Kind   string
-	Value  string
+	Source         string `json:"-"`
+	Agent          string `json:"-"`
+	Kind           string `json:"-"`
+	Value          string `json:"-"`
+	ManifestDigest string `json:"-"`
 }
 
 type Message struct {
@@ -63,6 +64,7 @@ type Reader struct {
 	CodexRoot  string
 	ClaudeRoot string
 	GrokRoot   string
+	Cursor     *CursorConfig
 
 	indexMu     sync.Mutex
 	traceMu     sync.Mutex

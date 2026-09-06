@@ -94,10 +94,11 @@ type Tab struct {
 }
 
 type AgentSessionRef struct {
-	Source string
-	Agent  string
-	Kind   string
-	Value  string
+	Source         string `json:"-"`
+	Agent          string `json:"-"`
+	Kind           string `json:"-"`
+	Value          string `json:"-"`
+	ManifestDigest string `json:"-"`
 }
 
 type Pane struct {
@@ -117,7 +118,10 @@ type Pane struct {
 	// AgentSession is trusted runtime state for transcript adapters. It must
 	// never be serialized to a Web client.
 	AgentSession *AgentSessionRef `json:"-"`
-	Scroll       *struct {
+	// TranscriptRefChecked prevents a failed local resolver from being repeated
+	// by another read path for this same fresh snapshot.
+	TranscriptRefChecked bool `json:"-"`
+	Scroll               *struct {
 		OffsetFromBottom int `json:"offset_from_bottom"`
 		ViewportRows     int `json:"viewport_rows"`
 	} `json:"scroll"`
