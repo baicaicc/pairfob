@@ -26,6 +26,7 @@ type herdrPaneWire struct {
 	AgentStatus  string                 `json:"agent_status"`
 	Label        *string                `json:"label"`
 	Title        string                 `json:"terminal_title_stripped"`
+	TerminalID   string                 `json:"terminal_id"`
 	AgentSession *herdrAgentSessionWire `json:"agent_session"`
 	Scroll       *struct {
 		OffsetFromBottom int `json:"offset_from_bottom"`
@@ -92,6 +93,9 @@ func (h *Herdr) snapshot(ctx context.Context, session SessionRef) (Snapshot, err
 		if !validResourceID.MatchString(pane.PaneID) || !validResourceID.MatchString(pane.WorkspaceID) || !validResourceID.MatchString(pane.TabID) {
 			return Snapshot{}, responseFault("session.snapshot", "invalid Herdr pane id", nil, false)
 		}
+		if !validOptionalResourceID(pane.TerminalID) {
+			return Snapshot{}, responseFault("session.snapshot", "invalid Herdr terminal id", nil, false)
+		}
 	}
 	out := Snapshot{
 		HerdrVersion: s.Version, HerdrProtocol: s.Protocol, CapturedAt: time.Now().Unix(),
@@ -121,7 +125,7 @@ func normalizePane(p herdrPaneWire) Pane {
 	out := Pane{
 		PaneID: p.PaneID, WorkspaceID: p.WorkspaceID, TabID: p.TabID, Cwd: p.Cwd,
 		Agent: p.Agent, AgentStatus: p.AgentStatus, Label: p.Label, Scroll: p.Scroll,
-		TerminalTitle: strings.TrimSpace(p.Title),
+		TerminalTitle: strings.TrimSpace(p.Title), TerminalID: p.TerminalID,
 	}
 	if session := p.AgentSession; session != nil && session.Source != "" && session.Agent != "" && session.Value != "" && (session.Kind == "id" || session.Kind == "path") {
 		out.AgentSession = &AgentSessionRef{Source: session.Source, Agent: session.Agent, Kind: session.Kind, Value: session.Value}

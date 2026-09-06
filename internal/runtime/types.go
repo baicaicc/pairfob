@@ -109,7 +109,10 @@ type Pane struct {
 	AgentStatus string  `json:"agent_status"`
 	Label       *string `json:"label"`
 	// TerminalTitle is the stripped PTY OSC title. Display-only; it is not a user-assigned name.
-	TerminalTitle    string `json:"terminal_title,omitempty"`
+	TerminalTitle string `json:"terminal_title,omitempty"`
+	// TerminalID is trusted Herdr identity for future terminal ownership mapping.
+	// It must never be serialized to a Web client.
+	TerminalID       string `json:"-"`
 	HistoryAvailable bool   `json:"history_available"`
 	// AgentSession is trusted runtime state for transcript adapters. It must
 	// never be serialized to a Web client.
