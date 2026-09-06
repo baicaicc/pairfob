@@ -82,6 +82,9 @@ func (r *Reader) ReadTraceDetail(ref Ref, detailRef string) (TraceDetail, error)
 	if !r.Supports(ref) {
 		return TraceDetail{}, ErrUnavailable
 	}
+	if r.supportsCursor(ref) {
+		return TraceDetail{}, ErrUnavailable
+	}
 	locator, err := decodeTraceDetailRef(ref, detailRef)
 	if err != nil {
 		return TraceDetail{}, err

@@ -100,6 +100,9 @@ func (e *Engine) markHistory(ctx context.Context, session runtime.SessionRef, vi
 		if ok && pane.AgentSession == nil {
 			pane.AgentSession = &runtime.AgentSessionRef{Source: ref.Source, Agent: ref.Agent, Kind: ref.Kind, Value: ref.Value, ManifestDigest: ref.ManifestDigest}
 		}
+		if ok && ref.Source == "allinone:cursor-acp" && ref.Agent == "cursor" {
+			pane.Agent = "Cursor ACP"
+		}
 		pane.TranscriptRefChecked = true
 		pane.HistoryAvailable = ok && e.Journal != nil && e.Journal.Available(ref)
 	}

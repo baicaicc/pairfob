@@ -106,6 +106,9 @@ func NewDefault() *Reader {
 }
 
 func (r *Reader) Supports(ref Ref) bool {
+	if r.supportsCursor(ref) {
+		return true
+	}
 	if ref.Kind != "id" || !sessionID.MatchString(ref.Value) {
 		return false
 	}
@@ -127,6 +130,9 @@ func (r *Reader) Available(ref Ref) bool {
 	if !r.Supports(ref) {
 		return false
 	}
+	if r.supportsCursor(ref) {
+		return r.cursorAvailable(ref)
+	}
 	_, err := r.transcriptPath(ref, false)
 	return err == nil
 }
@@ -140,6 +146,9 @@ func (r *Reader) Read(ref Ref, cursor *string, limit int) (Page, error) {
 	}
 	if limit < 1 || limit > 200 {
 		return Page{}, errors.New("invalid history limit")
+	}
+	if r.supportsCursor(ref) {
+		return r.readCursorHistory(ref, cursor, limit)
 	}
 	offset, err := decodeCursor(ref, cursor)
 	if err != nil {

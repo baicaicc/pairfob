@@ -53,6 +53,9 @@ func (r *Reader) ReadTrace(ref Ref, cursor *string, limit int) (TracePage, error
 	if limit < 1 || limit > 200 {
 		return TracePage{}, errors.New("invalid history limit")
 	}
+	if r.supportsCursor(ref) {
+		return r.readCursorTrace(ref, cursor, limit)
+	}
 	end, err := decodeCursor(ref, cursor)
 	if err != nil {
 		return TracePage{}, err

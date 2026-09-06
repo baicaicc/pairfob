@@ -264,46 +264,12 @@ func (c *CursorConfig) LoadClaim(manifest CursorManifest) (CursorClaim, error) {
 }
 
 func (c *CursorConfig) LoadSession(manifest CursorManifest) (CursorSession, error) {
-	var result CursorSession
 	raw, err := readPrivateFile(filepath.Join(manifest.OwnerDir, "session.json"), cursorSessionRecordMax, 0o600)
 	if err != nil {
-		return result, err
+		return CursorSession{}, err
 	}
-	var envelope struct {
-		SchemaVersion int             `json:"schemaVersion"`
-		Revision      int64           `json:"revision"`
-		SavedAt       string          `json:"savedAt"`
-		Session       json.RawMessage `json:"session"`
-	}
-	if err := decodeExactObject(raw, &envelope, "schemaVersion", "revision", "savedAt", "session"); err != nil || envelope.SchemaVersion != 1 || envelope.Revision <= 0 || envelope.Revision > 1<<53-1 {
-		return result, errors.New("invalid Cursor session envelope")
-	}
-	if result.SavedAt, err = time.Parse(time.RFC3339, envelope.SavedAt); err != nil {
-		return result, errors.New("invalid Cursor session savedAt")
-	}
-	var session map[string]json.RawMessage
-	if err := json.Unmarshal(envelope.Session, &session); err != nil || session == nil {
-		return result, errors.New("invalid Cursor session body")
-	}
-	if err := requiredJSON(session, "schemaVersion", &result.SchemaVersion); err != nil || result.SchemaVersion != 1 {
-		return result, errors.New("invalid Cursor session schemaVersion")
-	}
-	for key, target := range map[string]*string{"ownerId": &result.OwnerID, "cwd": &result.Cwd, "nativeSessionId": &result.NativeSessionID} {
-		if err := requiredJSON(session, key, target); err != nil || !validBounded(*target, cursorIDMax) {
-			return result, fmt.Errorf("invalid Cursor session %s", key)
-		}
-	}
-	if rawStatus, ok := session["status"]; ok {
-		var status string
-		if json.Unmarshal(rawStatus, &status) == nil && validBounded(status, cursorIDMax) {
-			result.Status = status
-		}
-	}
-	result.Revision = envelope.Revision
-	if result.OwnerID != manifest.OwnerID || result.Cwd != manifest.Cwd || result.NativeSessionID != manifest.NativeSessionID {
-		return result, errors.New("Cursor session does not match manifest")
-	}
-	return result, nil
+	parsed, err := parseCursorSession(raw, manifest, false)
+	return parsed.CursorSession, err
 }
 
 func SameCursorIdentity(a, b CursorProcessIdentity) bool {

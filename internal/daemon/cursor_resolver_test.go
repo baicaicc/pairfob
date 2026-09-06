@@ -401,6 +401,12 @@ func TestDisabledCursorResolverMakesNoRuntimeOrIdentityCalls(t *testing.T) {
 
 func TestCursorSnapshotAndHistoryRPCSharePrivateResolverResult(t *testing.T) {
 	f := newCursorResolverFixture(t)
+	operationID, runID, wireText := "operation-one", "run-one", "<private-wrapper>wire</private-wrapper>"
+	operation := map[string]any{"operationId": operationID, "runId": runID, "caseId": f.manifest.CaseID, "ownerId": f.manifest.OwnerID, "cwd": f.manifest.Cwd, "nativeSessionId": f.manifest.NativeSessionID, "text": wireText, "publicText": "verified public answer", "status": "completed", "toolCalls": []any{"private tool"}}
+	writeDaemonJSON(t, f.sessionPath, map[string]any{"schemaVersion": 1, "revision": 2, "savedAt": "2026-09-06T12:00:01Z", "session": map[string]any{"schemaVersion": 1, "ownerId": f.manifest.OwnerID, "cwd": f.manifest.Cwd, "nativeSessionId": f.manifest.NativeSessionID, "status": "ready", "operations": []any{operation}, "publicHistory": []any{"unverified secret"}}})
+	publicInputs := daemonMkdir(t, filepath.Join(f.manifest.OwnerDir, "public-inputs"), 0o700)
+	operationHash, wireHash := sha256.Sum256([]byte(operationID)), sha256.Sum256([]byte(wireText))
+	writeDaemonJSON(t, filepath.Join(publicInputs, hex.EncodeToString(operationHash[:])+".json"), map[string]any{"schemaVersion": 1, "origin": "service", "ownerId": f.manifest.OwnerID, "caseId": f.manifest.CaseID, "cwd": f.manifest.Cwd, "nativeSessionId": f.manifest.NativeSessionID, "operationId": operationID, "runId": runID, "wireTextSha256": hex.EncodeToString(wireHash[:]), "userText": "verified public question"})
 	engine, client := runtimeRPCClient(t, f.runtime)
 	engine.CursorConfig = f.config
 	engine.Journal.Cursor = f.config
@@ -410,14 +416,20 @@ func TestCursorSnapshotAndHistoryRPCSharePrivateResolverResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded := string(raw)
-	if !strings.Contains(encoded, `"history_available":false`) || strings.Contains(encoded, f.manifestPath) || strings.Contains(encoded, f.manifest.TerminalID) {
+	if !strings.Contains(encoded, `"history_available":true`) || !strings.Contains(encoded, `"agent":"Cursor ACP"`) || strings.Contains(encoded, f.manifestPath) || strings.Contains(encoded, f.manifest.TerminalID) {
 		t.Fatalf("Cursor snapshot leaked private resolver state: %s", raw)
 	}
-	if _, err := client.RPC("History", map[string]any{"pane_id": f.pane.PaneID, "limit": 20}); err == nil || err.Error() != "transcript_unavailable" {
-		t.Fatalf("Cursor history was exposed before P3: %v", err)
+	if raw, err := client.RPC("History", map[string]any{"pane_id": f.pane.PaneID, "limit": 20}); err != nil || !strings.Contains(string(raw), "verified public question") || !strings.Contains(string(raw), "verified public answer") || strings.Contains(string(raw), "private-wrapper") {
+		t.Fatalf("Cursor history was not readable: %s, %v", raw, err)
 	}
-	if _, err := client.RPC("AgentTrace", map[string]any{"pane_id": f.pane.PaneID, "limit": 20}); err == nil || err.Error() != "transcript_unavailable" {
-		t.Fatalf("Cursor trace was exposed before P3: %v", err)
+	if raw, err := client.RPC("AgentTrace", map[string]any{"pane_id": f.pane.PaneID, "limit": 20}); err != nil || !strings.Contains(string(raw), "verified public question") || !strings.Contains(string(raw), "verified public answer") || strings.Contains(string(raw), "private tool") {
+		t.Fatalf("Cursor trace was not readable: %s, %v", raw, err)
+	}
+	if raw, err := client.RPC("AgentTraceSummary", map[string]any{"pane_id": f.pane.PaneID, "limit": 20}); err != nil || !strings.Contains(string(raw), "verified public question") || !strings.Contains(string(raw), "verified public answer") {
+		t.Fatalf("Cursor trace summary was not readable: %s, %v", raw, err)
+	}
+	if _, err := client.RPC("AgentTraceDetail", map[string]any{"pane_id": f.pane.PaneID, "detail_ref": "unsupported"}); err == nil || err.Error() != "transcript_unavailable" {
+		t.Fatalf("Cursor trace detail was not refused: %v", err)
 	}
 }
 
@@ -532,7 +544,7 @@ func newCursorResolverFixture(t *testing.T) cursorResolverFixture {
 	writeDaemonJSON(t, bindingPath, journal.CursorBinding{SchemaVersion: 1, OwnerDir: ownerDir, OwnerID: "owner-one", CaseID: "case-one", Cwd: cwd, Identity: ownerIdentity, TerminalID: terminalID})
 	writeDaemonJSON(t, claimPath, claim)
 	sessionPath := filepath.Join(ownerDir, "session.json")
-	writeDaemonJSON(t, sessionPath, map[string]any{"schemaVersion": 1, "revision": 1, "savedAt": "2026-09-06T12:00:00Z", "session": map[string]any{"schemaVersion": 1, "ownerId": "owner-one", "cwd": cwd, "nativeSessionId": "native-one", "status": "ready"}})
+	writeDaemonJSON(t, sessionPath, map[string]any{"schemaVersion": 1, "revision": 1, "savedAt": "2026-09-06T12:00:00Z", "session": map[string]any{"schemaVersion": 1, "ownerId": "owner-one", "cwd": cwd, "nativeSessionId": "native-one", "status": "ready", "operations": []any{}}})
 	terminalHash := sha256.Sum256([]byte(terminalID))
 	manifestPath := filepath.Join(registry, hex.EncodeToString(terminalHash[:])+".json")
 	writeDaemonJSON(t, manifestPath, manifest)
