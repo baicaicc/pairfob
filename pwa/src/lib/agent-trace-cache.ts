@@ -1,4 +1,5 @@
 import type { AgentTraceDetail, AgentTraceItem } from "./operations";
+import type { AgentTracePresentationPolicy } from "./agent-trace-window";
 
 export type AgentTraceCacheEntry = {
   items: AgentTraceItem[];
@@ -7,6 +8,10 @@ export type AgentTraceCacheEntry = {
   truncated: boolean;
   signature: string;
   tail: number;
+  policy: AgentTracePresentationPolicy;
+  identity: string;
+  pageDepth: number;
+  seenCursors: string[];
 };
 
 const MAX_CACHED_PANES = 6;
@@ -22,7 +27,7 @@ export type AgentTraceDetailState = {
 };
 
 function copy(entry: AgentTraceCacheEntry): AgentTraceCacheEntry {
-  return { ...entry, items: entry.items.map((item) => ({ ...item })) };
+  return { ...entry, items: entry.items.map((item) => ({ ...item })), seenCursors: [...entry.seenCursors] };
 }
 
 /** Short-lived screen cache only; daemon changes clear it before another computer can reuse a pane id. */

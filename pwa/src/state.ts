@@ -32,6 +32,7 @@ import { loadNetworkMode, persistNetworkMode, type NetworkMode } from "./lib/net
 import { parseTermMode, TERM_MODE_OPTIONS, type TermMode } from "./lib/terminal-mode";
 import type { MuxProtocol } from "./lib/protocol/mux";
 import { NO_OPERATION_CAPABILITIES, type AgentTraceItem, type OperationCapabilities } from "./lib/operations";
+import type { AgentTracePresentationPolicy } from "./lib/agent-trace-window";
 import type { NoticeScope } from "./lib/notice-scope";
 import { SNAPSHOT_FALLBACK_MS, PANE_READ_FALLBACK_MS } from "./poll";
 import { createNoticeLifecycle, type Notice } from "./state-notices";
@@ -223,6 +224,10 @@ export type AppState = BoardViewState & {
   agentTraceSig: string;
   agentTraceLoadState: AgentTraceLoadState;
   agentTraceTail: number;
+  agentTracePolicy: AgentTracePresentationPolicy;
+  agentTraceIdentity: string;
+  agentTracePageDepth: number;
+  agentTraceSeenCursors: string[];
   /** User bubble shown before the transcript has caught up. */
   agentTracePending: string;
   /** Trace snapshot immediately before the optimistic user turn was submitted. */
@@ -320,6 +325,10 @@ export const state: AppState = {
   agentTraceSig: "",
   agentTraceLoadState: "cold",
   agentTraceTail: 0,
+  agentTracePolicy: "owning-user",
+  agentTraceIdentity: "",
+  agentTracePageDepth: 0,
+  agentTraceSeenCursors: [],
   agentTracePending: "",
   agentTracePendingBase: [],
   agentTraceFollow: true,
@@ -721,6 +730,10 @@ export function resetPaneView(): void {
   state.agentTraceSig = "";
   state.agentTraceLoadState = "cold";
   state.agentTraceTail = 0;
+  state.agentTracePolicy = "owning-user";
+  state.agentTraceIdentity = "";
+  state.agentTracePageDepth = 0;
+  state.agentTraceSeenCursors = [];
   state.agentTracePending = "";
   state.agentTracePendingBase = [];
   state.agentTraceFollow = true;

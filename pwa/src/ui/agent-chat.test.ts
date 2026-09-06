@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 const source = await Bun.file(new URL("./agent-chat.ts", import.meta.url)).text();
+const trace = await Bun.file(new URL("./agent-chat-trace.ts", import.meta.url)).text();
 const pane = await Bun.file(new URL("./pane.ts", import.meta.url)).text();
 const view = await Bun.file(new URL("./session/view.ts", import.meta.url)).text();
 const desk = await Bun.file(new URL("./desk.ts", import.meta.url)).text();
@@ -18,7 +19,7 @@ describe("agent-chat is a first-class pane mode", () => {
     const enter = fn("export function enterAgentChat(", "export function leaveAgentChat(");
     expect(enter).toContain('setPaneTermMode(state.paneId, "agent")');
     expect(source).not.toContain("session.history");
-    expect(source).toContain("session.agentTrace");
+    expect(trace).toContain("session.agentTrace");
     expect(source).toContain("session.promptAgent");
     expect(source).toContain("markPaneSubmitted");
   });
@@ -58,8 +59,8 @@ describe("agent-chat is a first-class pane mode", () => {
     expect(source).toContain('t("hist.loadEarlier")');
     expect(source).toContain('next.querySelector(".agent-stream-inner")?.prepend(olderButton())');
     expect(source).not.toContain("olderButton(), stream");
-    expect(source).toContain("firstTurnNeedsUser");
-    expect(source).toContain("TRACE_PAGE = 200");
+    expect(trace).toContain("firstTurnNeedsUser");
+    expect(trace).toContain("TRACE_PAGE = 200");
   });
 
   test("leave paints guided itself; list-back keeps the mode", () => {

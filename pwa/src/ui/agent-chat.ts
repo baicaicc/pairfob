@@ -1,12 +1,10 @@
 import { canPromptAgent, chromeName, statusLabel } from "../lib/dashboard";
 import { button, node } from "../lib/dom";
 import { t } from "../lib/i18n";
-import { firstTurnNeedsUser, mergeAgentTraceSegments } from "../lib/agent-trace-view";
-import { agentTraceDetailRevision, cacheAgentTrace, cachedAgentTrace } from "../lib/agent-trace-cache";
-import type { AgentTraceItem, AgentTracePage } from "../lib/operations";
-import { ProtocolError } from "../lib/protocol/errors";
+import { agentTraceDetailRevision } from "../lib/agent-trace-cache";
+import { cursorPendingBoundary, sameAgentTracePosition } from "../lib/agent-trace-window";
+import type { AgentTraceItem } from "../lib/operations";
 import { messageOf } from "../lib/notices";
-import { track } from "../lib/telemetry";
 import { fitOperationPrompt, OPERATION_INPUT_LIMITS } from "../lib/operations";
 import { render } from "../paint";
 import {
@@ -28,6 +26,12 @@ import { leaveFullTerminal } from "./full-terminal";
 import { chromeActionCluster, syncChromeStop } from "./session/chrome-actions";
 import { paintAgentStream, readDetailsState, type AgentEmptySpec } from "./agent-chat-stream";
 import { loadToolDetail, toolDetailView } from "./agent-chat-detail";
+import {
+  cancelAgentTraceRefresh,
+  refreshAgentTraceState,
+  restoreAgentTraceState,
+  syncAgentTraceBinding,
+} from "./agent-chat-trace";
 
 function fingerprint(items: AgentTraceItem[]): string {
   return JSON.stringify(items);
@@ -46,69 +50,12 @@ function atBottom(el: HTMLElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 32;
 }
 
-const TRACE_PAGE = 200;
-const OLDER_FILL_MAX = 4;
-let traceRequest = 0;
-
 function streamSig(items: AgentTraceItem[], working: boolean): string {
   return `${fingerprint(items)}|${working ? 1 : 0}|${state.agentTraceLoadState}|${state.agentTraceTruncated ? 1 : 0}|${agentTraceDetailRevision()}`;
 }
 
-function applyTracePage(page: AgentTracePage, older: boolean): boolean {
-  if (older) {
-    if (!page.items.length) {
-      const changed = state.agentTraceNext !== page.nextCursor;
-      state.agentTraceNext = page.nextCursor;
-      return changed;
-    }
-    const tailWasWholeView = state.agentTraceItems.length === state.agentTraceTail;
-    const merged = mergeAgentTraceSegments(page.items, state.agentTraceItems);
-    state.agentTraceItems = merged.items;
-    if (tailWasWholeView) state.agentTraceTail = Math.max(0, state.agentTraceTail - merged.overlap);
-    state.agentTraceNext = page.nextCursor;
-    absorbPending(state.agentTraceItems);
-    return true;
-  }
-  const sig = fingerprint(page.items);
-  if (sig === state.agentTraceSig) {
-    const changed = state.agentTraceItems.length === state.agentTraceTail && state.agentTraceNext !== page.nextCursor;
-    if (state.agentTraceItems.length === state.agentTraceTail) state.agentTraceNext = page.nextCursor;
-    absorbPending(page.items);
-    return changed;
-  }
-  const kept = Math.max(0, state.agentTraceItems.length - state.agentTraceTail);
-  const prefix = kept > 0 ? state.agentTraceItems.slice(0, kept) : [];
-  const merged = mergeAgentTraceSegments(prefix, page.items);
-  state.agentTraceItems = merged.items;
-  state.agentTraceTail = page.items.length - merged.overlap;
-  state.agentTraceSig = sig;
-  if (prefix.length === 0) state.agentTraceNext = page.nextCursor;
-  absorbPending(state.agentTraceItems);
-  return true;
-}
-
-function rememberTrace(paneId: string): void {
-  cacheAgentTrace(paneId, {
-    items: state.agentTraceItems,
-    nextCursor: state.agentTraceNext,
-    note: state.agentTraceNote,
-    truncated: state.agentTraceTruncated,
-    signature: state.agentTraceSig,
-    tail: state.agentTraceTail,
-  });
-}
-
 export function restoreAgentTrace(paneId: string): boolean {
-  const entry = cachedAgentTrace(paneId);
-  if (!entry) return false;
-  state.agentTraceItems = entry.items;
-  state.agentTraceNext = entry.nextCursor;
-  state.agentTraceNote = entry.note;
-  state.agentTraceTruncated = entry.truncated;
-  state.agentTraceSig = entry.signature;
-  state.agentTraceTail = entry.tail;
-  state.agentTraceLoadState = "ready";
-  return true;
+  return restoreAgentTraceState(paneId);
 }
 
 const traceUnavailableNote = () => t("chat.noTrace");
@@ -129,13 +76,6 @@ function emptySpec(working: boolean): AgentEmptySpec {
     title: t("chat.noChat"),
     sub: canSend() ? t("chat.sendBelow") : t("chat.cantSend"),
   };
-}
-
-function traceLatencyBucket(ms: number): string {
-  if (ms < 100) return "lt_100ms";
-  if (ms < 500) return "lt_500ms";
-  if (ms < 2_000) return "lt_2s";
-  return "gte_2s";
 }
 
 function olderButton(): HTMLButtonElement {
@@ -201,21 +141,13 @@ function absorbPending(items: AgentTraceItem[]): void {
   }
 }
 
-/** Tool outputs and live text may grow in place without moving the event itself. */
-function sameTracePosition(before: AgentTraceItem, after: AgentTraceItem): boolean {
-  if (before.type !== after.type) return false;
-  if (before.type === "tool" && after.type === "tool") {
-    return before.name === after.name && before.input === after.input && before.text === after.text;
-  }
-  const left = before.text || "";
-  const right = after.text || "";
-  return left === right || ((before.type === "assistant" || before.type === "thinking") && right.startsWith(left));
-}
-
 function pendingBoundary(items: AgentTraceItem[]): number {
   const baseline = state.agentTracePendingBase;
+  if (state.agentTracePolicy === "disjoint") {
+    return cursorPendingBoundary(baseline, items, state.agentTracePending.trim(), state.agentTraceNext === null);
+  }
   let index = 0;
-  while (index < baseline.length && index < items.length && sameTracePosition(baseline[index], items[index])) {
+  while (index < baseline.length && index < items.length && sameAgentTracePosition(baseline[index], items[index])) {
     index += 1;
   }
   return index;
@@ -241,90 +173,14 @@ function canSend(agent = selectedAgent()): boolean {
 }
 
 export async function refreshAgentTrace(older = false): Promise<boolean> {
-  const session = state.live;
-  const paneId = state.paneId;
-  if (!session || !paneId || !state.agentChat || !session.isConnected()) return false;
-  if (state.agentTraceBusy) return false;
-  if (older && !state.agentTraceNext) return false;
-  const request = ++traceRequest;
-  const measureColdLoad = !older && state.agentTraceLoadState === "cold" && !state.agentTraceItems.length;
-  const startedAt = Date.now();
-  let measured = false;
-  const stream = streamEl();
-  const follow = !older && (!stream || atBottom(stream));
-  const top = stream?.scrollTop ?? 0;
-  const height = stream?.scrollHeight ?? 0;
-  state.agentTraceBusy = true;
-  if (!older && !state.agentTraceItems.length && !state.agentTracePending) state.agentTraceLoadState = "loading";
-  stream?.setAttribute("aria-busy", "true");
-  syncOlderButton();
-  if (!older) {
-    state.agentTraceNote = "";
-    state.agentTraceTruncated = false;
-  }
-  let changed = false;
-  try {
-    let cursor: string | null = older ? state.agentTraceNext : null;
-    let pulls = 0;
-    const filling = !older;
-    while (pulls < (filling ? OLDER_FILL_MAX : 1)) {
-      const page = await session.agentTrace(paneId, cursor, TRACE_PAGE);
-      if (request !== traceRequest || state.live !== session || state.paneId !== paneId || !state.agentChat) return false;
-      if (measureColdLoad && !measured) {
-        track("pwa_agent_trace", {
-          result: page.items.length ? "content" : "empty",
-          extra: traceLatencyBucket(Date.now() - startedAt),
-        });
-        measured = true;
-      }
-      const applied = applyTracePage(page, cursor !== null);
-      if (page.truncated) state.agentTraceTruncated = true;
-      changed = applied || changed;
-      pulls += 1;
-      state.agentTraceLoadState = "ready";
-      rememberTrace(paneId);
-      if (applied || pulls === 1) {
-        const current = streamEl();
-        const pageTop = cursor === null ? top : current?.scrollTop ?? top;
-        const pageHeight = cursor === null ? height : current?.scrollHeight ?? height;
-        if (!patchAgentChat({ follow, older: cursor !== null, top: pageTop, height: pageHeight })) render();
-      }
-      if (cursor !== null && !applied) break;
-      if (!filling || !firstTurnNeedsUser(state.agentTraceItems, state.agentTraceNext) || !state.agentTraceNext) break;
-      cursor = state.agentTraceNext;
-    }
-    state.agentTraceLoadState = "ready";
-    rememberTrace(paneId);
-    syncOlderButton();
-    return changed;
-  } catch (error) {
-    if (request !== traceRequest || state.live !== session || state.paneId !== paneId || !state.agentChat) return false;
-    const code = error instanceof ProtocolError ? error.code : "";
-    if (measureColdLoad && !measured) {
-      track("pwa_agent_trace", { result: code || "failed", extra: traceLatencyBucket(Date.now() - startedAt) });
-      measured = true;
-    }
-    state.agentTraceLoadState = "error";
-    if (code === "transcript_unavailable") {
-      state.agentTraceItems = [];
-      state.agentTraceNext = null;
-      state.agentTraceSig = "";
-      state.agentTraceTail = 0;
-      state.agentTraceTruncated = false;
-      state.agentTraceNote = state.agentTracePending ? "" : traceUnavailableNote();
-      if (!patchAgentChat({ follow: true })) render();
-      return false;
-    }
-    state.agentTraceNote = messageOf(error, "read");
-    if (!patchAgentChat({ follow })) render();
-    return false;
-  } finally {
-    if (request === traceRequest && state.live === session && state.paneId === paneId && state.agentChat) {
-      state.agentTraceBusy = false;
-      streamEl()?.setAttribute("aria-busy", "false");
-      syncOlderButton();
-    }
-  }
+  return refreshAgentTraceState(older, {
+    absorbPending,
+    atBottom,
+    patch: patchAgentChat,
+    stream: streamEl,
+    syncOlder: () => syncOlderButton(),
+    unavailableNote: traceUnavailableNote,
+  });
 }
 
 export function enterAgentChat(): void {
@@ -354,8 +210,7 @@ export function leaveAgentChat(opts?: { rememberGuided?: boolean; paint?: boolea
   if (!state.agentChat) return;
   if (opts?.rememberGuided !== false) setPaneTermMode(state.paneId, "guided");
   state.agentChat = false;
-  traceRequest++;
-  state.agentTraceBusy = false;
+  cancelAgentTraceRefresh();
   state.agentTracePending = "";
   state.agentTracePendingBase = [];
   if (opts?.paint !== false) render();
@@ -497,6 +352,7 @@ export function patchAgentChat(opts?: { follow?: boolean; older?: boolean; top?:
   const stream = streamEl();
   const chrome = root?.querySelector(".chrome");
   if (!root || !stream || !(chrome instanceof HTMLElement) || !state.agentChat) return false;
+  syncAgentTraceBinding();
   const selected = selectedAgent();
   const working = selected?.status === "working";
   const items = visibleItems();
