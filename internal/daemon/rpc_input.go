@@ -87,17 +87,20 @@ func (e *Engine) rpcPromptAgent(s *sess, id string, params json.RawMessage) {
 		e.replyErr(s, id, "too_large", "agent prompt exceeds 32 KiB")
 		return
 	}
-	pane, findErr := e.findPane(p.Session, p.PaneID)
-	if findErr != nil {
-		e.replyRuntimeErr(s, id, findErr, "pane_not_found")
-		return
-	}
-	if pane == nil || pane.Agent == "" {
-		e.replyErr(s, id, "agent_not_found", "pane does not currently host an agent")
-		return
-	}
-	receipt, operationID, ok := e.executeRPC(s, id, p.Session, p.OperationID, true, runtime.PromptAgentCommand{Target: p.PaneID, Text: p.Text}, "agent_not_found")
+	operationID, ok := mutationOperationID(p.OperationID, id, true)
 	if !ok {
+		e.replyErr(s, id, "invalid_argument", "invalid operation_id")
+		return
+	}
+	command := runtime.PromptAgentCommand{Target: p.PaneID, Text: p.Text}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	session := runtimeSession(p.Session)
+	receipt, err := e.executeTrackedMutation(ctx, s.deviceID, session, operationID, command, func() (runtime.Receipt, error) {
+		return e.executePromptAgent(ctx, s.deviceID, operationID, session, command)
+	})
+	if err != nil {
+		e.replyRuntimeErr(s, id, err, "agent_not_found")
 		return
 	}
 	e.audit("prompt_agent", map[string]any{"device_id": s.deviceID, "pane_id": p.PaneID, "bytes": len([]byte(p.Text)), "outcome": receipt.Outcome})

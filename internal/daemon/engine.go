@@ -114,18 +114,19 @@ type Engine struct {
 	Reconnect string
 	Devices   map[string]*Device
 
-	Store          *state.Store
-	Audit          *audit.Logger
-	Identity       state.Identity
-	RelayURL       string
-	VAPIDPublic    string
-	VAPIDPrivate   []byte
-	VAPIDSubject   string
-	PushHTTPClient *http.Client
-	PushEnabled    bool
-	Direct         DirectAcceptor
-	Journal        *journal.Reader
-	CursorConfig   *journal.CursorConfig
+	Store             *state.Store
+	Audit             *audit.Logger
+	Identity          state.Identity
+	RelayURL          string
+	VAPIDPublic       string
+	VAPIDPrivate      []byte
+	VAPIDSubject      string
+	PushHTTPClient    *http.Client
+	PushEnabled       bool
+	Direct            DirectAcceptor
+	Journal           *journal.Reader
+	CursorConfig      *journal.CursorConfig
+	cursorHTTPTimeout time.Duration
 
 	pairOpenMu    sync.Mutex
 	mu            sync.Mutex
