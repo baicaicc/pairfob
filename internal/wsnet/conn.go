@@ -121,7 +121,7 @@ func DialProtocol(rawURL, subprotocol string) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := websocket.Dialer{Subprotocols: []string{subprotocol}, TLSClientConfig: tlsCfg}
+	d := websocket.Dialer{Subprotocols: []string{subprotocol}, TLSClientConfig: tlsCfg, Proxy: http.ProxyFromEnvironment}
 	ws, _, err := d.Dial(rawURL, nil)
 	if err != nil {
 		return nil, err
