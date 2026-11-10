@@ -114,6 +114,27 @@ describe("dashboard mapping", () => {
     expect(agentMeta(unnamed, "space")).toBe("pairfob");
   });
 
+  test("a merged daemon's Herdr session reaches the card, outside space groups", () => {
+    const agents = mapSnapshotAgents({
+      workspaces: [
+        { workspace_id: "w1", label: "Pairfob", cwd: "/repo/pairfob" },
+        { workspace_id: "work::w1", label: "Pairfob", cwd: "/repo/pairfob", session: "work" },
+      ],
+      panes: [
+        { pane_id: "w1:p1", workspace_id: "w1", agent: "codex", agent_status: "idle" },
+        { pane_id: "work::w1:p1", workspace_id: "work::w1", agent: "codex", agent_status: "idle" },
+      ],
+    });
+    expect(agents[0].sessionName).toBeUndefined();
+    expect(agents[1].sessionName).toBe("work");
+    expect(agentMeta(agents[0])).toBe("pairfob");
+    expect(agentMeta(agents[1])).toBe("work · pairfob");
+    expect(agentMeta(agents[1], "agent")).toBe("work · pairfob");
+    // The space group title carries the session, so the card does not repeat it.
+    expect(agentMeta(agents[1], "space")).toBe("pairfob");
+    expect(herdSignature(agents)).not.toBe(herdSignature([agents[0], { ...agents[1], sessionName: undefined }]));
+  });
+
   test("agent grouping keeps the agent in the title and the folder in the subtitle", () => {
     const unnamed = mapSnapshotAgents({
       workspaces: [{ workspace_id: "w1", label: "Pairfob", cwd: "/repo/pairfob" }],

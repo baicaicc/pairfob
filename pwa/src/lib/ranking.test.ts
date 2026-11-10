@@ -109,6 +109,16 @@ describe("groupAgents", () => {
     expect(groupAgents(sample, "space", {}).map((group) => group.id)).toEqual(["w-x", "w-k"]);
   });
 
+  test("space groups of a merged daemon name their Herdr session", () => {
+    const merged: AgentCard[] = [
+      { paneId: "w1:p1", agent: "codex", status: "idle", workspaceId: "w1", workspaceLabel: "Pairfob", cwd: "/" },
+      { paneId: "work::w1:p1", agent: "codex", status: "idle", workspaceId: "work::w1", workspaceLabel: "Pairfob", sessionName: "work", cwd: "/" },
+    ];
+    const groups = groupAgents(merged, "space", {});
+    expect(groups.map((group) => group.id)).toEqual(["w1", "work::w1"]);
+    expect(groups.map((group) => group.title)).toEqual(["Pairfob", "work · Pairfob"]);
+  });
+
   test("agent groups by type and parks unbound panes together", () => {
     const groups = groupAgents(sample, "agent", { a: 3, c: 2, b: 1, d: 1 });
     expect(groups.map((group) => group.title)).toEqual(["claude", "codex", "未绑定 Agent"]);

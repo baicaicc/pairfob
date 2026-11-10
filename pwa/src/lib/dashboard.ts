@@ -12,7 +12,7 @@ export type SnapshotWire = {
   session?: unknown;
   focused?: { pane_id?: string; tab_id?: string; workspace_id?: string };
   layouts?: unknown;
-  workspaces?: Array<{ workspace_id: string; label?: string; cwd?: string; tokens?: unknown; worktree?: unknown }>;
+  workspaces?: Array<{ workspace_id: string; label?: string; cwd?: string; tokens?: unknown; worktree?: unknown; session?: unknown }>;
   tabs?: Array<{ tab_id: string; workspace_id: string; label?: string }>;
   panes?: Array<{
     pane_id?: string;
@@ -94,6 +94,7 @@ export function mapSnapshotAgents(snapshot: SnapshotWire): DashboardAgentCard[] 
         worktree: displayWorktree(ws?.worktree),
         status: snapshotAgentStatus(hasAgent, pane.agent_status, pane.launch_pending === true),
         workspaceLabel: ws?.label?.trim() || "",
+        sessionName: boundedString(ws?.session, 128),
         workspaceCwd: ws?.cwd?.trim() || undefined,
         cwd: pane.cwd || ws?.cwd || "",
         viewportRows: pane.scroll?.viewport_rows,
@@ -323,6 +324,8 @@ export function agentMeta(agent: AgentCard, group: ListGroup = "flat"): string {
     bits.push(text);
   };
   if (group !== "agent") push(who);
+  // A merged daemon lists several Herdr sessions; a space group already names it.
+  if (group !== "space") push(agent.sessionName);
   if (group === "space") {
     if (dir && !same(dir, workspace)) push(dir);
   } else {
@@ -389,6 +392,7 @@ export function herdSignature(agents: DashboardAgentCard[]): string {
       agent.interactiveReady ?? null,
       agent.launchPending ?? null,
       agent.runtimeSession ?? null,
+      agent.sessionName ?? null,
       agent.activity ?? null,
     ]),
   );

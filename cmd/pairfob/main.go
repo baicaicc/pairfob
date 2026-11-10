@@ -85,6 +85,7 @@ func runDaemon(store *state.Store, sock string) error {
 		rt = runtime.NewOffline(rtErr)
 	} else {
 		go prepareRuntimeAvailability(rt, source, herdrAutostartEnabled(devFake))
+		rt = mergeHerdrSessions(rt)
 	}
 
 	stored, err := store.LoadRelay()

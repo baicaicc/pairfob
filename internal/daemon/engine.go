@@ -593,7 +593,7 @@ func (e *Engine) RuntimeKind() string {
 		return "fake"
 	case *runtimeapi.Offline:
 		return "offline"
-	case *runtimeapi.Herdr:
+	case *runtimeapi.Herdr, *runtimeapi.Merged:
 		return "herdr"
 	case *runtimeapi.Core:
 		return "herdr-core"

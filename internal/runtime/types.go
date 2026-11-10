@@ -123,6 +123,9 @@ type Workspace struct {
 	Label       string             `json:"label"`
 	Cwd         string             `json:"cwd"`
 	AgentStatus string             `json:"agent_status"`
+	// Session names the Herdr session a workspace belongs to in a merged view
+	// (see Merged). It is empty for the default session and without merging.
+	Session string `json:"session,omitempty"`
 }
 
 type Tab struct {

@@ -33,6 +33,8 @@ export interface AgentCard extends DisplayMetadata {
   interactiveReady?: boolean;
   launchPending?: boolean;
   runtimeSession?: string;
+  /** The Herdr session a merged daemon reports for this workspace; absent for the default session. */
+  sessionName?: string;
   /** The step the agent is on, from its transcript (working, blocked or done panes). */
   activity?: PaneActivity;
 }
@@ -162,7 +164,9 @@ export function parseListGroup(raw: string | null | undefined): ListGroup {
 function groupKey(agent: AgentCard, mode: Exclude<ListGroup, "flat">): { id: string; title: string } {
   if (mode === "space") {
     const id = agent.workspaceId || agent.workspaceLabel || "space";
-    return { id, title: agent.workspaceLabel || t("workspace.unnamed") };
+    const label = agent.workspaceLabel || t("workspace.unnamed");
+    // Same-named workspaces of different Herdr sessions stay apart by title too.
+    return { id, title: agent.sessionName ? `${agent.sessionName} · ${label}` : label };
   }
   const name = agent.agent.trim();
   if (!name) return { id: "unbound", title: t("group.unbound") };
