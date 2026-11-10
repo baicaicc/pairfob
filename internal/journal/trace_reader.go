@@ -99,6 +99,9 @@ func (r *Reader) ReadTraceWith(ref Ref, cursor *string, limit int, options Trace
 	if limit < 1 || limit > 200 {
 		return TracePage{}, errors.New("invalid history limit")
 	}
+	if ref.Source == CursorACPSource {
+		return r.readCursorACPTrace(ref, cursor, limit)
+	}
 	if piAgent(ref.Agent) {
 		return r.readPiTrace(ref, cursor, limit, options)
 	}

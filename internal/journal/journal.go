@@ -42,11 +42,13 @@ var (
 // Ref is a trusted pane-to-agent-session binding verified by the runtime. Callers
 // must never construct it from phone-supplied transcript identifiers.
 type Ref struct {
-	Leaf   *string // Exact live branch selection, nil when the provider has none.
-	Source string
-	Agent  string
-	Kind   string
-	Value  string
+	Leaf   *string `json:"-"` // Exact live branch selection, nil when the provider has none.
+	Source string  `json:"-"`
+	Agent  string  `json:"-"`
+	Kind   string  `json:"-"`
+	Value  string  `json:"-"`
+	// ManifestDigest is set only for a daemon-resolved allInOne Cursor ACP ref.
+	ManifestDigest string `json:"-"`
 }
 
 type Message struct {
@@ -72,6 +74,9 @@ type Reader struct {
 	// HermesRoot holds state.db; OpencodeRoot holds storage/.
 	HermesRoot   string
 	OpencodeRoot string
+	// CursorACP is the explicit allInOne Cursor ACP configuration; nil leaves
+	// that adapter disabled (cursor_acp_config.go).
+	CursorACP *CursorConfig
 	// NativeRoots configures additional providers without changing their trusted
 	// session identity or allowing a caller to supply arbitrary transcript paths.
 	NativeRoots map[string]string
@@ -152,6 +157,9 @@ func NewDefault() *Reader {
 }
 
 func (r *Reader) Supports(ref Ref) bool {
+	if ref.Source == CursorACPSource {
+		return r.supportsCursorACP(ref)
+	}
 	if ref.Agent == "cmd" {
 		return ref.Source == "pairfob:cmd" && ref.Kind == "id" && sessionID.MatchString(ref.Value) && ref.Leaf != nil && (*ref.Leaf == "" || sessionID.MatchString(*ref.Leaf)) && r.NativeRoots["cmd"] != ""
 	}
@@ -200,6 +208,9 @@ func (r *Reader) Available(ref Ref) bool {
 	if !r.Supports(ref) {
 		return false
 	}
+	if ref.Source == CursorACPSource {
+		return r.cursorACPAvailable(ref)
+	}
 	if piAgent(ref.Agent) {
 		_, err := r.loadPiSession(ref, false)
 		return err == nil
@@ -224,6 +235,9 @@ func (r *Reader) Read(ref Ref, cursor *string, limit int) (Page, error) {
 	}
 	if limit < 1 || limit > 200 {
 		return Page{}, errors.New("invalid history limit")
+	}
+	if ref.Source == CursorACPSource {
+		return r.readCursorACPHistory(ref, cursor, limit)
 	}
 	offset, err := decodeCursor(ref, cursor)
 	if err != nil {

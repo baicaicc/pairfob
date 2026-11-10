@@ -57,6 +57,10 @@ func (r *Reader) ReadTraceDetail(ref Ref, detailRef string) (TraceDetail, error)
 	if !r.Supports(ref) {
 		return TraceDetail{}, ErrUnavailable
 	}
+	if ref.Source == CursorACPSource {
+		// Cursor ACP pages carry only user and assistant text, no detail refs.
+		return TraceDetail{}, ErrUnavailable
+	}
 	if piAgent(ref.Agent) {
 		return r.readPiTraceDetail(ref, detailRef)
 	}

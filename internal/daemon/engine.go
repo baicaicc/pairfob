@@ -165,6 +165,11 @@ type Engine struct {
 	PushEnabled    bool
 	Direct         DirectAcceptor
 	Journal        *journal.Reader
+	// CursorConfig enables the allInOne Cursor ACP resolver and owner prompt
+	// path (cursor_acp_resolver.go); nil keeps both disabled.
+	CursorConfig      *journal.CursorConfig
+	cursorHTTPTimeout time.Duration
+	cursorIdentity    cursorIdentityReader
 
 	pairOpenMu    sync.Mutex
 	mu            sync.Mutex
@@ -253,6 +258,12 @@ func NewEngine(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime) *Engine {
 
 // NewPersistentEngine restores (or creates) the daemon identity and devices.
 func NewPersistentEngine(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime, store *state.Store, logger *audit.Logger) (*Engine, error) {
+	// An explicit but invalid Cursor ACP configuration fails startup before
+	// any state is created or loaded.
+	cursorConfig, err := journal.LoadCursorConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
 	if err := ValidateAllowedRoots(); err != nil {
 		return nil, err
 	}
@@ -277,6 +288,7 @@ func NewPersistentEngine(hub *mux.Hub, conn mux.Conn, rt runtimeapi.Runtime, sto
 		return nil, err
 	}
 	e := newEngine(hub, conn, rt, pk, sk)
+	e.CursorConfig, e.Journal.CursorACP = cursorConfig, cursorConfig
 	e.Store, e.Audit, e.Identity = store, logger, id
 	e.DaemonID, e.Reconnect = id.DaemonID, relay.ReconnectToken
 	e.RelayURL, e.VAPIDPublic = relay.URL, vapid.Public

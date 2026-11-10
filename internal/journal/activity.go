@@ -34,7 +34,8 @@ type activityCacheEntry struct {
 // ReadActivity is bounded and stat-cached for snapshot polling. An unreadable
 // or unsupported transcript is unknown, never proof that a task completed.
 func (r *Reader) ReadActivity(ref Ref) Activity {
-	if !r.Supports(ref) {
+	// A Cursor ACP ref names a registration, not a cursor-agent transcript.
+	if !r.Supports(ref) || ref.Source == CursorACPSource {
 		return Activity{}
 	}
 	if storeAgent(ref.Agent) {

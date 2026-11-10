@@ -136,12 +136,15 @@ type Tab struct {
 
 type AgentSessionRef struct {
 	// Leaf and LiveActivity are local observation data, never phone fields.
-	Leaf         *string
-	LiveActivity *PaneActivity
-	Source       string
-	Agent        string
-	Kind         string
-	Value        string
+	Leaf         *string       `json:"-"`
+	LiveActivity *PaneActivity `json:"-"`
+	Source       string        `json:"-"`
+	Agent        string        `json:"-"`
+	Kind         string        `json:"-"`
+	Value        string        `json:"-"`
+	// ManifestDigest binds a daemon-resolved local registration to its exact
+	// bytes (allInOne Cursor ACP); Herdr-reported bindings leave it empty.
+	ManifestDigest string `json:"-"`
 }
 
 type Pane struct {
@@ -172,6 +175,9 @@ type Pane struct {
 	// AgentSession is trusted runtime state for transcript adapters. It must
 	// never be serialized to a Web client.
 	AgentSession *AgentSessionRef `json:"-"`
+	// TranscriptRefChecked prevents a failed local resolver from being repeated
+	// by another read path for this same fresh snapshot.
+	TranscriptRefChecked bool `json:"-"`
 	// TaskEvidence is daemon-local transcript evidence for notification deduplication.
 	TaskEvidence string `json:"-"`
 	Scroll       *struct {

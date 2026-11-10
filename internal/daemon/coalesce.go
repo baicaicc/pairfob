@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"pairfob/internal/journal"
 	"pairfob/internal/runtime"
 )
 
@@ -82,7 +83,7 @@ func (e *Engine) observe(session *string, query runtime.Query) (runtime.View, er
 		if err != nil {
 			return nil, err
 		}
-		return e.markHistory(view), nil
+		return e.markHistory(ctx, runtimeSession(session), view), nil
 	}
 	if key, ok := observeKey(session, query); ok {
 		return e.reads.do(key, run)
@@ -90,7 +91,11 @@ func (e *Engine) observe(session *string, query runtime.Query) (runtime.View, er
 	return run()
 }
 
-func (e *Engine) markHistory(view runtime.View) runtime.View {
+// markHistory decorates the phone snapshot. Herdr's own bindings keep their
+// path; a pane without one may resolve to a verified allInOne Cursor ACP owner
+// (selectJournalRef), which is attached only after activity decoration so the
+// built-in title/activity readers never see it.
+func (e *Engine) markHistory(ctx context.Context, session runtime.SessionRef, view runtime.View) runtime.View {
 	snap, ok := view.(runtime.SnapshotView)
 	if !ok {
 		return view
@@ -98,7 +103,15 @@ func (e *Engine) markHistory(view runtime.View) runtime.View {
 	snap.Snapshot = e.decorateAgentActivity(snap.Snapshot)
 	for i := range snap.Snapshot.Panes {
 		pane := &snap.Snapshot.Panes[i]
-		pane.HistoryAvailable = pane.AgentSession != nil && e.Journal != nil && e.Journal.Available(journalRef(pane.AgentSession))
+		ref, ok := e.selectJournalRef(ctx, session, *pane)
+		if ok && pane.AgentSession == nil {
+			pane.AgentSession = &runtime.AgentSessionRef{Source: ref.Source, Agent: ref.Agent, Kind: ref.Kind, Value: ref.Value, ManifestDigest: ref.ManifestDigest}
+		}
+		if ok && ref.Source == journal.CursorACPSource && ref.Agent == journal.CursorACPAgent {
+			pane.Agent = cursorACPDisplayAgent
+		}
+		pane.TranscriptRefChecked = true
+		pane.HistoryAvailable = ok && e.Journal != nil && e.Journal.Available(ref)
 	}
 	return snap
 }

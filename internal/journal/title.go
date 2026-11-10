@@ -29,7 +29,8 @@ var codexStateFile = regexp.MustCompile(`^state_([0-9]+)\.sqlite$`)
 // empty. The short bounded cache also lets a name generated later replace the
 // prompt excerpt without reading the native store on every terminal frame.
 func (r *Reader) ReadTitle(ref Ref) Title {
-	if !r.Supports(ref) {
+	// A Cursor ACP ref names a registration, not a cursor-agent transcript.
+	if !r.Supports(ref) || ref.Source == CursorACPSource {
 		return Title{}
 	}
 	switch ref.Agent {
