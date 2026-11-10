@@ -9,8 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	"pairfob/internal/envelope"
 )
@@ -32,6 +35,12 @@ func TestDialProtocolUsesConfiguredProxy(t *testing.T) {
 	}
 	upgrader := UpgraderFor(SubprotocolV2)
 	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only the tunnelled dial is under test. A stray request (another
+		// process reaching a reused loopback port) is refused, not a failure.
+		if !websocket.IsWebSocketUpgrade(r) {
+			http.Error(w, "not a websocket request", http.StatusBadRequest)
+			return
+		}
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			t.Error(err)
@@ -43,11 +52,13 @@ func TestDialProtocolUsesConfiguredProxy(t *testing.T) {
 		}
 	}))
 	defer relay.Close()
+	var tunnelled atomic.Bool
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodConnect || r.Host != "pairfob-proxy-test.invalid:80" {
 			http.Error(w, "unexpected proxy destination", http.StatusBadRequest)
 			return
 		}
+		tunnelled.Store(true)
 		upstream, err := net.DialTimeout("tcp", strings.TrimPrefix(relay.URL, "http://"), time.Second)
 		if err != nil {
 			t.Error(err)
@@ -78,5 +89,8 @@ func TestDialProtocolUsesConfiguredProxy(t *testing.T) {
 	cmd.Env = append(cmd.Env, "PAIRFOB_PROXY_TEST_CHILD=1", "HTTP_PROXY="+proxy.URL, "NO_PROXY=")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("proxy round trip failed: %v\n%s", err, output)
+	}
+	if !tunnelled.Load() {
+		t.Fatal("the relay dial did not go through the proxy")
 	}
 }
