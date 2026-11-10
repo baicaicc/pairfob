@@ -54,7 +54,7 @@ if [[ -n "$pending_names" ]]; then
   (cd "$ORIGIN_DIR" && bunx wrangler d1 migrations apply pairfob --remote --config "$CONFIG")
 fi
 
-echo "deploying build $BUILD…"
+echo "deploying build ${BUILD}…"
 (cd "$ORIGIN_DIR" && bunx wrangler deploy --config "$CONFIG" --var "BUILD:$BUILD")
 
 echo "verifying…"

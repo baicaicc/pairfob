@@ -71,6 +71,18 @@ fi
   });
 });
 
+describe("fork shell scripts", () => {
+  test("never let a non-ASCII character touch a bare $NAME", () => {
+    // macOS /bin/bash 3.2 reads the UTF-8 bytes of "…" after $BUILD as part of
+    // the name, so `set -u` aborts the deploy midway. Brace such expansions.
+    for (const script of ["scripts/deploy-kidsbox.sh", "scripts/build-kidsbox-daemon.sh"]) {
+      const offending = readFileSync(join(root, script), "utf8").split("\n")
+        .filter(line => /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/.test(line));
+      expect({ script, offending }).toEqual({ script, offending: [] });
+    }
+  });
+});
+
 describe("build-kidsbox-daemon.sh", () => {
   test("stamps a version the update channels never order", () => {
     const script = readFileSync(join(root, "scripts/build-kidsbox-daemon.sh"), "utf8");
