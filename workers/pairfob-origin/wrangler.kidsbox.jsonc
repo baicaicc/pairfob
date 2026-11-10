@@ -1,0 +1,57 @@
+{
+  // Self-hosted origin for this fork: https://pair.kidsbox.cc
+  // Deploy with ../../scripts/deploy-kidsbox.sh (build, pack, migrate, deploy).
+  // Mirrors wrangler.jsonc (scripts/kidsbox-fork.test.ts keeps them aligned)
+  // except the custom domain, the D1 database, no Analytics Engine binding and
+  // no native-shell origins: the Android and iOS shells are built for
+  // pairfob.com, so phones use the PWA here.
+  "name": "pairfob-origin",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal", "request_signal_passthrough"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "BUILD": "kidsbox-dev",
+    "P2P_OPEN": "1",
+    "APP_ORIGINS": ""
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+      "persist": true
+    }
+  },
+  "routes": [
+    { "pattern": "pair.kidsbox.cc", "custom_domain": true }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pairfob",
+      "database_id": "f01b3ad9-f7f4-4b6f-91f0-16fbd0a70293",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "DAEMON_ROOM", "class_name": "DaemonRoom" },
+      { "name": "PAIRING_INDEX", "class_name": "PairingIndex" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DaemonRoom", "PairingIndex"]
+    }
+  ],
+  "assets": {
+    "directory": "./public-dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": true
+  }
+}
