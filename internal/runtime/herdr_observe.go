@@ -345,6 +345,8 @@ func (h *Herdr) Observe(ctx context.Context, session SessionRef, query Query) (V
 		return h.inspectAgent(ctx, session, value)
 	case PaneReadQuery:
 		return h.readPane(ctx, session, value)
+	case PaneProcessInfoQuery:
+		return h.paneProcessInfo(ctx, session, value)
 	case WorktreeListQuery:
 		if err := h.requireFeature(ctx, session, FeatureWorktreeList, "worktree.list"); err != nil {
 			return nil, err

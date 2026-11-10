@@ -122,6 +122,8 @@ func (f *Fake) Observe(ctx context.Context, session SessionRef, query Query) (Vi
 		}, nil
 	case HistoryQuery:
 		return nil, unsupported("history", "history reader is not configured")
+	case PaneProcessInfoQuery:
+		return nil, unsupported("pane.process_info", "process identity is not available from the fake runtime")
 	case MachineListQuery:
 		return MachineListView{Machines: append([]Machine(nil), f.Machines...)}, nil
 	default:
