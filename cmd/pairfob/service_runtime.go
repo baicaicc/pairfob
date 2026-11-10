@@ -10,7 +10,7 @@ import (
 	runtimeapi "pairfob/internal/runtime"
 )
 
-var serviceCopiedKeys = []string{"HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "HERDR_CLIENT_SOCKET_PATH", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "GROK_HOME", "PAIRFOB_STATE_DIR", "PAIRFOB_ADMIN_SOCK", "PAIRFOB_HERDR_AUTOSTART", "PAIRFOB_MULTI_SESSION", "PAIRFOB_RUNTIME", "PAIRFOB_HC", "HC_SESSION", "HC_SOCKET", "PAIRFOB_PUSH", "PAIRFOB_VAPID_SUBJECT", "PAIRFOB_QUOTA_PROVIDERS"}
+var serviceCopiedKeys = append([]string{"HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "HERDR_CLIENT_SOCKET_PATH", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "GROK_HOME", "PAIRFOB_STATE_DIR", "PAIRFOB_ADMIN_SOCK", "PAIRFOB_HERDR_AUTOSTART", "PAIRFOB_MULTI_SESSION", "PAIRFOB_RUNTIME", "PAIRFOB_HC", "HC_SESSION", "HC_SOCKET", "PAIRFOB_PUSH", "PAIRFOB_VAPID_SUBJECT", "PAIRFOB_QUOTA_PROVIDERS"}, forkServiceKeys...)
 
 // The variables serviceRuntimeEnvironment writes. None holds a credential, so
 // an install may print their values; any other variable is named only.
@@ -41,7 +41,13 @@ func serviceRuntimeEnvironment() [][2]string {
 			out = append(out, [2]string{key, value})
 			continue
 		}
-		if key != "HC_SESSION" && (!strings.HasPrefix(key, "PAIRFOB_") || key == "PAIRFOB_STATE_DIR" || key == "PAIRFOB_ADMIN_SOCK") && !filepath.IsAbs(value) {
+		if serviceProxyKey(key) {
+			if !proxyCarriesCredential(value) {
+				out = append(out, [2]string{key, value})
+			}
+			continue
+		}
+		if key != "HC_SESSION" && (!strings.HasPrefix(key, "PAIRFOB_") || key == "PAIRFOB_STATE_DIR" || key == "PAIRFOB_ADMIN_SOCK" || key == "PAIRFOB_ALLINONE_CURSOR_CONFIG") && !filepath.IsAbs(value) {
 			if absolute, err := filepath.Abs(value); err == nil {
 				value = absolute
 			}

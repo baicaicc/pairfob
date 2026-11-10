@@ -166,6 +166,9 @@ func DialProtocol(rawURL, subprotocol string) (*Conn, error) {
 		// A stalled TCP connect otherwise holds the daemon's reconnect loop
 		// for the OS timeout, which is minutes on a network change.
 		NetDialContext: (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		// A computer that only reaches the relay through an HTTP proxy sets
+		// HTTPS_PROXY / HTTP_PROXY (and NO_PROXY) for the daemon.
+		Proxy: http.ProxyFromEnvironment,
 	}
 	ws, _, err := d.Dial(rawURL, nil)
 	if err != nil {
