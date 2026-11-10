@@ -189,6 +189,17 @@ func (m *Merged) Observe(ctx context.Context, session SessionRef, query Query) (
 			view = qualifyWorktreeList(target, list)
 		}
 		return view, err
+	case PaneProcessInfoQuery:
+		target, err := routeMerged("pane.process_info", &value.PaneID)
+		if err != nil {
+			return nil, err
+		}
+		view, err := m.herdr.Observe(ctx, target, value)
+		if info, ok := view.(PaneProcessInfoView); ok {
+			info.PaneID = qualifyMergedID(target, info.PaneID)
+			view = info
+		}
+		return view, err
 	case MachineListQuery:
 		return m.herdr.Observe(ctx, DefaultSession(), value)
 	default:

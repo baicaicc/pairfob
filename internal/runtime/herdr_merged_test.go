@@ -179,6 +179,28 @@ func TestMergedRoutesByQualifiedID(t *testing.T) {
 	assertOnlyRead(fixture.root, "w1:p1")
 }
 
+func TestMergedRoutesProcessInfoAndKeepsTheMergedPaneID(t *testing.T) {
+	fixture := startMergedFixture(t, standardReply, standardReply)
+	ctx := context.Background()
+	view, err := fixture.merged.Observe(ctx, DefaultSession(), PaneProcessInfoQuery{PaneID: "work::w1:p1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info := view.(PaneProcessInfoView); info.PaneID != "work::w1:p1" {
+		t.Fatalf("process info must answer for the merged-view pane id, got %q", info.PaneID)
+	}
+	view, err = fixture.merged.Observe(ctx, DefaultSession(), PaneProcessInfoQuery{PaneID: "w1:p1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info := view.(PaneProcessInfoView); info.PaneID != "w1:p1" {
+		t.Fatalf("a default-session pane keeps its id, got %q", info.PaneID)
+	}
+	if len(fixture.work.snapshot()) != 1 || len(fixture.root.snapshot()) != 1 {
+		t.Fatal("each process read must reach only the owning session")
+	}
+}
+
 func TestMergedRefusesBadRoutesBeforeCallingHerdr(t *testing.T) {
 	fixture := startMergedFixture(t, standardReply, standardReply)
 	ctx := context.Background()
