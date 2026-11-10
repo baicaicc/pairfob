@@ -87,6 +87,10 @@ func (e *Engine) rpcPromptAgent(s *sess, id string, params json.RawMessage) {
 		e.replyErr(s, id, "too_large", "agent prompt exceeds 32 KiB")
 		return
 	}
+	if e.CursorConfig != nil {
+		e.rpcPromptAgentWithCursor(s, id, p.Session, p.OperationID, runtime.PromptAgentCommand{Target: p.PaneID, Text: p.Text})
+		return
+	}
 	pane, findErr := e.findPane(p.Session, p.PaneID)
 	if findErr != nil {
 		e.replyRuntimeErr(s, id, findErr, "pane_not_found")
